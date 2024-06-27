@@ -1,0 +1,57 @@
+loki:
+  enabled: true
+  isDefault: true
+  env:
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: iam-loki-s3
+          key: AWS_ACCESS_KEY_ID
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: iam-loki-s3
+          key: AWS_SECRET_ACCESS_KEY
+  config:
+    schema_config:
+      configs:
+        - from: 2021-05-12
+          store: boltdb-shipper
+          object_store: s3
+          schema: v11
+          index:
+            prefix: loki_index_
+            period: 24h
+    storage_config:
+      aws:
+        s3: s3://us-west-1/loki-logs   //Change the bucket name to which you want to save the logs 
+        s3forcepathstyle: true
+        bucketnames: loki-logs
+        region: us-west-1                       //Change the region to where you creted the S3 bucket
+        insecure: false
+        sse_encryption: false
+      boltdb_shipper:
+        shared_store: s3
+        cache_ttl: 360h
+  url: http://{{ (include "loki.serviceName" .) }}:{{ .Values.loki.service.port }}
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: http-metrics
+    initialDelaySeconds: 45
+  livenessProbe:
+    httpGet:
+      path: /ready
+      port: http-metrics
+    initialDelaySeconds: 45
+  datasource:
+    jsonData: "{}"
+    uid: ""
+
+promtail:
+  enabled: true
+  config:
+    logLevel: info
+    serverPort: 3101
+    clients:
+      - url: http://{{ .Release.Name }}:3100/loki/api/v1/push
